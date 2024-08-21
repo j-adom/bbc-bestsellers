@@ -51,7 +51,7 @@ app.post('/process', async (req, res) => {
 
 app.get('/', (req, res) => {
     res.send('Google Drive File Processor is running')
-})
+});
 
 app.get('/download', (req, res) => {
   const file = path.join(__dirname, 'output.csv');
