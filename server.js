@@ -107,6 +107,37 @@ function validateAndFormatISBN(isbn) {
     return cleanIsbn;
 }
 
+async function searchBooksInfo(isbns) {
+  let headers = {
+      "Content-Type": 'application/json',
+      "Authorization": ISBNDB_API_KEY
+  };
+
+  const instance = axios.create({
+      baseURL: 'https://api.premium.isbndb.com',
+      headers: headers
+  });
+
+  // Join the ISBNs array into a comma-separated string and prepend with 'isbns='
+  const isbnsString = `isbns=${isbns.join(',')}`;
+
+  try {
+      const response = await instance.post('/books', isbnsString);
+      // console.log(response);
+
+      // Assuming the response structure contains the books information
+      if (response.data.data ) {
+          return response.data.data; // Return the books data if available
+      } else {
+          console.error('Unexpected response structure:', response.data);
+          return []; // Return an empty array if the structure is not as expected
+      }
+  } catch (error) {
+      console.error(`Error fetching book info:`, error);
+      return []; // Return an empty array on error
+  }
+}
+
 async function processGoogleDriveFiles() {
     console.log('Starting to process Google Drive files...');
     const files = await listFilesInFolder(GOOGLE_DRIVE_FOLDER_ID);
@@ -167,27 +198,47 @@ async function processGoogleDriveFiles() {
     });
   
     combinedData.sort((a, b) => (b.Stores - a.Stores || b.Sales - a.Sales));
+    // Fetch book info for all ISBNs at once
+    let top250 =  combinedData.slice(0, 250);
+    let topISBNS = top250.map(obj => obj.ISBN);
+    const bookInfo = await searchBooksInfo(topISBNS);
+
+    // Combine fetched book info with sales and store counts
+    let finalBooks = bookInfo.map(book => ({
+      ISBN: book.isbn13,
+      Sales: bookSales.get(book.isbn13) || 0,
+      Stores: isbnStores.get(book.isbn13) || 0,
+      Title: book.title || 'Unknown',
+      Authors: book.authors ? book.authors.join(', ') : 'Unknown',
+      Publisher: book.publisher || 'Unknown',
+      Categories: categorizeBook(book),
+      Description: book.description || book.synopsis || 'Unknown',
+      Binding: book.binding || 'Unknown',
+      Subjects: book.subjects ? book.subjects.join(', ') : 'Unknown'
+    }));
+    console.log(finalBooks[0]);
+    return finalBooks;
+    // let top200 = combinedData.slice(0, 200);
+    // let isbndbFail = 0;
   
-    let top200 = combinedData.slice(0, 200);
-    let isbndbFail = 0;
+    // for (let book of top200) {
+    //   console.log("Fetching book info for ISBN:", book.ISBN);
+    //   const bookInfo = await searchBookInfo(book.ISBN);
+    //   if (bookInfo) {
+    //     book.Title = bookInfo.title || 'Unknown';
+    //     book.Authors = bookInfo.authors ? bookInfo.authors.join(', ') : 'Unknown';
+    //     book.Binding || 'Unknown',
+    //     book.Publisher = bookInfo.publisher || 'Unknown';
+    //     book.Categories = categorizeBook(bookInfo);
+    //     book.Subjects = bookInfo.subjects ? bookInfo.subjects.join(', ') : 'Unknown';
+    //     book.Description = bookInfo.synopsis || 'Unknown';
+    //   } else {
+    //     isbndbFail++;
+    //   }
+    // }
   
-    for (let book of top200) {
-      console.log("Fetching book info for ISBN:", book.ISBN);
-      const bookInfo = await searchBookInfo(book.ISBN);
-      if (bookInfo) {
-        book.Title = bookInfo.title || 'Unknown';
-        book.Authors = bookInfo.authors ? bookInfo.authors.join(', ') : 'Unknown';
-        book.Publisher = bookInfo.publisher || 'Unknown';
-        book.Categories = categorizeBook(bookInfo);
-        book.Subjects = bookInfo.subjects ? bookInfo.subjects.join(', ') : 'Unknown';
-        book.Description = bookInfo.synopsis || 'Unknown';
-      } else {
-        isbndbFail++;
-      }
-    }
-  
-    console.log('ISBNdb lookup failures:', isbndbFail);
-    return top200;
+    // console.log('ISBNdb lookup failures:', isbndbFail);
+    // return top200;
 }
   
 async function listFilesInFolder(folderId) {
