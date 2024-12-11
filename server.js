@@ -63,20 +63,31 @@ app.get('/download', (req, res) => {
 const headerMap = {
     'ISBN_number': 'ISBN',
     'SKU': 'ISBN',
+    'isbn': 'ISBN',
+    'sku': 'ISBN',
     'Ean': 'ISBN',
     'Net quantity': 'Sales',
     'Qty': 'Sales',
     'QTY': 'Sales',
+    'Quantity': 'Sales',
+    'QUANTITY': 'Sales',
     'Count': 'Sales',
     'Units': 'Sales',
+    'units': 'Sales',
     'Items Sold': 'Sales',
     'Units Sold': 'Sales',
     'GTIN': 'ISBN',
+    'Lineitem quantity': 'Sales',
+    'Lineitem sku': 'ISBN',
+    'Item': 'ISBN',
     ' GTIN': 'ISBN',
+    'GTIN': 'ISBN',
     'ISBN ': 'ISBN',
-    ' Sls' : 'Sales',
-    'SALES' : 'Sales',
-    'Sls' : 'Sales',
+    ' Sls': 'Sales',
+    'sales': 'Sales',
+    'SALES': 'Sales',
+    'Sls': 'Sales',
+    'soldqty': 'Sales',
     'ISBN         ': 'ISBN',
     'Item Code': 'ISBN'
     // Add more mappings as needed
@@ -168,17 +179,17 @@ async function processGoogleDriveFiles() {
             console.log(`Parsed ${parsedData.length} rows from ${file.name}`);
 
             parsedData.forEach(row => {
-                const isbn = row['ISBN'];
+                const isbn = row['ISBN'];``
                 const sales = parseInt(row['Sales'], 10);
 
                 if (isbn && !isNaN(sales)) {
                     bookSales.set(isbn, (bookSales.get(isbn) || 0) + sales);
-                    isbnStores.set(isbn, (isbnStores.get(isbn) || 0) + 1);
+                    // Add the ISBN to the set of unique ISBNs for this file
+                    uniqueIsbnsInFile.add(isbn);
                 } else if (!isbn) {
                     invalidIsbnCount++;
                 }
-                // Add the ISBN to the set of unique ISBNs for this file
-                uniqueIsbnsInFile.add(isbn);
+                
             });
            
             // Update the isbnStores with the unique ISBNs found in this file
