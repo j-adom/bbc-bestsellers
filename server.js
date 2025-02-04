@@ -89,8 +89,8 @@ const headerMap = {
     'Sls': 'Sales',
     'soldqty': 'Sales',
     'ISBN         ': 'ISBN',
-    'Item Code': 'ISBN'
-    'Net Quantity': 'Sales'
+    'Item Code': 'ISBN',
+    'Net Quantity': 'Sales',
     // Add more mappings as needed
 };
 
