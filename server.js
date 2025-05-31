@@ -98,25 +98,29 @@ function normalizeHeaders(headers) {
     return headers.map(header => headerMap[header] || header);
 }
 
-function validateAndFormatISBN(isbn) {
-    // Convert to string and remove any non-digit characters
-    let cleanIsbn = String(isbn).replace(/[^0-9X]/gi, '');
+function validateAndFormatISBN(input) {
+  if (typeof input !== 'string') {
+    input = String(input);
+  }
 
-    // Check if it's in scientific notation
-    if (/e/i.test(String(isbn))) {
-        console.warn(`Skipping ISBN in scientific notation: ${isbn}`);
-        return null;
+  // Convert scientific notation to full number string
+  if (input.includes('e') || input.includes('E')) {
+    const num = Number(input);
+    if (!Number.isNaN(num)) {
+      input = num.toFixed(0); // Remove decimals if any
     }
+  }
 
-    // Check length
-    if (cleanIsbn.length !== 10 && cleanIsbn.length !== 13) {
-        console.warn(`Skipping invalid ISBN length: ${isbn}`);
-        return null;
-    }
+  // Remove all non-digit characters
+  const digitsOnly = input.replace(/\D/g, '');
 
-    // Additional checks can be added here (e.g., checksum validation)
+  // Validate 13-digit ISBNs starting with 978 or 979
+  if (/^97[89]\d{10}$/.test(digitsOnly)) {
+    return digitsOnly;
+  }
 
-    return cleanIsbn;
+  // Optionally log or return null if invalid
+  return null;
 }
 
 async function searchBooksInfo(isbns) {
