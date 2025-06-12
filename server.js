@@ -22,7 +22,7 @@ const GOOGLE_DRIVE_FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID;
 // });
 // const drive = google.drive({ version: 'v3', auth });
 const auth = new google.auth.GoogleAuth({
-    keyFile: 'bbc-bs-28b1398a3317.json',
+    keyFile: '/data/secrets/bbc-creds.json',
     scopes: ['https://www.googleapis.com/auth/drive.readonly'],
   });
 
