@@ -8,7 +8,7 @@ const axios = require('axios');
 const xlsx = require('xlsx');
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 3001;
 
 const ISBNDB_API_KEY = process.env.ISBNDB_API_KEY;
 const ISBNDB_BASE_URL = 'https://api2.isbndb.com';
@@ -22,7 +22,7 @@ const GOOGLE_DRIVE_FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID;
 // });
 // const drive = google.drive({ version: 'v3', auth });
 const auth = new google.auth.GoogleAuth({
-    keyFile: '/data/secrets/bbc-creds.json',
+    keyFile: 'data/secrets/bbc-creds.json',
     scopes: ['https://www.googleapis.com/auth/drive.readonly'],
   });
 
@@ -91,6 +91,8 @@ const headerMap = {
     'ISBN         ': 'ISBN',
     'Item Code': 'ISBN',
     'Net Quantity': 'Sales',
+    'SOLD': 'Sales',
+    'Sold': 'Sales',
     // Add more mappings as needed
 };
 
@@ -219,20 +221,75 @@ async function processGoogleDriveFiles() {
     let topISBNS = top250.map(obj => obj.ISBN);
     const bookInfo = await searchBooksInfo(topISBNS);
 
+    // Track data quality metrics
+    let dataQuality = {
+      total: top250.length,
+      foundInAPI: bookInfo.length,
+      missingFromAPI: top250.length - bookInfo.length,
+      missingDescriptions: 0,
+      missingSubjects: 0,
+      unknownCategories: 0
+    };
+
+    // Create a map of ISBNs from bookInfo for quick lookup
+    const bookInfoMap = new Map(bookInfo.map(book => [book.isbn13, book]));
+
     // Combine fetched book info with sales and store counts
-    let finalBooks = bookInfo.map(book => ({
-      ISBN: book.isbn13,
-      Sales: bookSales.get(book.isbn13) || 0,
-      Stores: isbnStores.get(book.isbn13) || 0,
-      Title: book.title || 'Unknown',
-      Authors: book.authors ? book.authors.join(', ') : 'Unknown',
-      Publisher: book.publisher || 'Unknown',
-      Categories: categorizeBook(book),
-      Description: book.description || book.synopsis || 'Unknown',
-      Binding: book.binding || 'Unknown',
-      Subjects: book.subjects ? book.subjects.join(', ') : 'Unknown'
-    }));
-    console.log(finalBooks[0]);
+    let finalBooks = top250.map(bookData => {
+      const book = bookInfoMap.get(bookData.ISBN);
+
+      // If book not found in API, create minimal record
+      if (!book) {
+        console.warn(`ISBN ${bookData.ISBN} not found in ISBNdb API`);
+        return {
+          ISBN: bookData.ISBN,
+          Sales: bookData.Sales,
+          Stores: bookData.Stores,
+          Title: 'Data Missing - Check ISBN',
+          Authors: 'Unknown',
+          Publisher: 'Unknown',
+          Categories: 'Unknown',
+          Description: 'Book data not found in ISBNdb',
+          Binding: 'Unknown',
+          Subjects: 'Unknown'
+        };
+      }
+
+      const subjects = book.subjects || [];
+      const subjectsString = Array.isArray(subjects) ? subjects.join(', ') : 'Unknown';
+      const description = book.description || book.synopsis || 'Unknown';
+      const category = categorizeBook(book);
+
+      // Track data quality issues
+      if (description === 'Unknown') dataQuality.missingDescriptions++;
+      if (subjectsString === 'Unknown' || subjects.length === 0) dataQuality.missingSubjects++;
+      if (category === 'Unknown') dataQuality.unknownCategories++;
+
+      return {
+        ISBN: book.isbn13,
+        Sales: bookSales.get(book.isbn13) || 0,
+        Stores: isbnStores.get(book.isbn13) || 0,
+        Title: book.title || 'Unknown',
+        Authors: book.authors ? book.authors.join(', ') : 'Unknown',
+        Publisher: book.publisher || 'Unknown',
+        Categories: category,
+        Description: description,
+        Binding: book.binding || 'Unknown',
+        Subjects: subjectsString
+      };
+    });
+
+    // Log data quality report
+    console.log('\n=== DATA QUALITY REPORT ===');
+    console.log(`Total books processed: ${dataQuality.total}`);
+    console.log(`Found in ISBNdb: ${dataQuality.foundInAPI}`);
+    console.log(`Missing from ISBNdb: ${dataQuality.missingFromAPI}`);
+    console.log(`Missing descriptions: ${dataQuality.missingDescriptions}`);
+    console.log(`Missing subjects: ${dataQuality.missingSubjects}`);
+    console.log(`Unknown categories: ${dataQuality.unknownCategories}`);
+    console.log('===========================\n');
+
+    console.log('Sample book data:', finalBooks[0]);
     return finalBooks;
     // let top200 = combinedData.slice(0, 200);
     // let isbndbFail = 0;
@@ -339,18 +396,57 @@ async function searchBookInfo(isbn) {
 }
   
 function categorizeBook(bookInfo) {
-    if (!Array.isArray(bookInfo.subjects) || bookInfo.subjects.length === 0) {
+    // Combine subjects, title, and other metadata for better categorization
+    const subjects = bookInfo.subjects || [];
+    const subjectsString = Array.isArray(subjects) ? subjects.join(', ').toLowerCase() : '';
+    const title = (bookInfo.title || '').toLowerCase();
+    const binding = (bookInfo.binding || '').toLowerCase();
+
+    // Return Unknown if no data available
+    if (!subjectsString && !title) {
       return "Unknown";
     }
-    if (bookInfo.subjects.includes("Children's Books")) {
+
+    // Define keyword patterns for each category
+    const childrenKeywords = [
+      "children's books", "juvenile fiction", "juvenile nonfiction",
+      "board book", "picture book", "early reader", "ages 0-", "ages 1-",
+      "ages 2-", "ages 3-", "ages 4-", "ages 5-", "ages 6-", "ages 7-", "ages 8-",
+      "preschool", "kindergarten", "baby", "toddler"
+    ];
+
+    const yaKeywords = [
+      "teen & young adult", "young adult fiction", "ya fiction", "teen fiction",
+      "juvenile fiction", "ages 12-", "ages 13-", "ages 14-", "ages 15-", "ages 16-", "ages 17-",
+      "coming of age", "high school", "teenager"
+    ];
+
+    const fictionKeywords = [
+      "fiction", "novel", "romance", "thriller", "mystery", "science fiction",
+      "fantasy", "horror", "literary fiction", "historical fiction", "crime",
+      "suspense", "adventure", "dystopian", "paranormal", "contemporary fiction",
+      "genre fiction", "stories", "sagas"
+    ];
+
+    // Check Children's first (most specific)
+    if (childrenKeywords.some(keyword => subjectsString.includes(keyword) || title.includes(keyword)) ||
+        binding.includes("board book")) {
       return "Children's";
-    } else if (bookInfo.subjects.includes("Teen & Young Adult")) {
-      return "Young Adult";
-    } else if (bookInfo.subjects.includes("Genre Fiction")) {
-      return "Fiction";
-    } else {
-      return "Non-Fiction";
     }
+
+    // Check Young Adult
+    if (yaKeywords.some(keyword => subjectsString.includes(keyword) || title.includes(keyword))) {
+      return "Young Adult";
+    }
+
+    // Check Fiction (must come before Non-Fiction to avoid false negatives)
+    if (fictionKeywords.some(keyword => subjectsString.includes(keyword))) {
+      return "Fiction";
+    }
+
+    // Default to Non-Fiction if none of the fiction/children/YA keywords match
+    // Most books without "fiction" in subjects are indeed non-fiction
+    return "Non-Fiction";
 }
   
   // ... (rest of the server code)
