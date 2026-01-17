@@ -13,18 +13,30 @@ const port = process.env.PORT || 3001;
 const ISBNDB_API_KEY = process.env.ISBNDB_API_KEY;
 const ISBNDB_BASE_URL = 'https://api2.isbndb.com';
 const GOOGLE_DRIVE_FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID;
+const GOOGLE_CREDENTIALS_FILE =
+  process.env.GOOGLE_APPLICATION_CREDENTIALS ||
+  process.env.GOOGLE_CREDENTIALS_FILE;
+const GOOGLE_CREDENTIALS_JSON = process.env.GOOGLE_CREDENTIALS_JSON;
 
 
 // Set up Google Drive API
-// const auth = new google.auth.GoogleAuth({
-//   credentials: JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS),
-//   scopes: ['https://www.googleapis.com/auth/drive.readonly'],
-// });
-// const drive = google.drive({ version: 'v3', auth });
-const auth = new google.auth.GoogleAuth({
-    keyFile: 'data/secrets/bbc-creds.json',
-    scopes: ['https://www.googleapis.com/auth/drive.readonly'],
-  });
+const googleAuthOptions = {
+  scopes: ['https://www.googleapis.com/auth/drive.readonly'],
+};
+if (GOOGLE_CREDENTIALS_JSON) {
+  try {
+    googleAuthOptions.credentials = JSON.parse(GOOGLE_CREDENTIALS_JSON);
+  } catch (error) {
+    throw new Error('Invalid GOOGLE_CREDENTIALS_JSON');
+  }
+} else if (GOOGLE_CREDENTIALS_FILE) {
+  googleAuthOptions.keyFile = GOOGLE_CREDENTIALS_FILE;
+} else {
+  throw new Error(
+    'Missing Google credentials. Set GOOGLE_APPLICATION_CREDENTIALS (path) or GOOGLE_CREDENTIALS_JSON.'
+  );
+}
+const auth = new google.auth.GoogleAuth(googleAuthOptions);
 
 // Initialize the Google Drive client
 let drive;
