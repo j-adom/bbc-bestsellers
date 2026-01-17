@@ -25,23 +25,24 @@ const googleAuthOptions = {
 };
 if (GOOGLE_CREDENTIALS_JSON) {
   try {
-    // Handle both escaped and unescaped JSON from environment variables
-    let jsonString = GOOGLE_CREDENTIALS_JSON;
+    let jsonString = GOOGLE_CREDENTIALS_JSON.trim();
 
-    // If the JSON is escaped (contains backslashes before quotes), try to unescape it
-    if (jsonString.startsWith('{\\')) {
-      try {
-        // Remove escape backslashes
-        jsonString = JSON.parse(`"${jsonString}"`);
-      } catch (unescapeError) {
-        console.error('Failed to unescape JSON:', unescapeError.message);
-      }
+    // Check if it's base64 encoded (doesn't start with '{')
+    if (!jsonString.startsWith('{')) {
+      console.log('Detected base64 encoded credentials, decoding...');
+      jsonString = Buffer.from(jsonString, 'base64').toString('utf-8');
+    }
+    // If the JSON is escaped (contains backslashes before quotes), unescape it
+    else if (jsonString.startsWith('{\\')) {
+      console.log('Detected escaped JSON, unescaping...');
+      jsonString = JSON.parse(`"${jsonString}"`);
     }
 
     googleAuthOptions.credentials = JSON.parse(jsonString);
+    console.log('✓ Successfully parsed Google credentials');
   } catch (error) {
     console.error('Failed to parse GOOGLE_CREDENTIALS_JSON:', error.message);
-    console.error('First 200 chars:', GOOGLE_CREDENTIALS_JSON.substring(0, 200));
+    console.error('Value length:', GOOGLE_CREDENTIALS_JSON?.length);
     throw new Error(`Invalid GOOGLE_CREDENTIALS_JSON: ${error.message}`);
   }
 } else if (GOOGLE_CREDENTIALS_FILE) {
