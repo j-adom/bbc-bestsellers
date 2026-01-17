@@ -25,7 +25,20 @@ const googleAuthOptions = {
 };
 if (GOOGLE_CREDENTIALS_JSON) {
   try {
-    googleAuthOptions.credentials = JSON.parse(GOOGLE_CREDENTIALS_JSON);
+    // Handle both escaped and unescaped JSON from environment variables
+    let jsonString = GOOGLE_CREDENTIALS_JSON;
+
+    // If the JSON is escaped (contains backslashes before quotes), try to unescape it
+    if (jsonString.startsWith('{\\')) {
+      try {
+        // Remove escape backslashes
+        jsonString = JSON.parse(`"${jsonString}"`);
+      } catch (unescapeError) {
+        console.error('Failed to unescape JSON:', unescapeError.message);
+      }
+    }
+
+    googleAuthOptions.credentials = JSON.parse(jsonString);
   } catch (error) {
     console.error('Failed to parse GOOGLE_CREDENTIALS_JSON:', error.message);
     console.error('First 200 chars:', GOOGLE_CREDENTIALS_JSON.substring(0, 200));
