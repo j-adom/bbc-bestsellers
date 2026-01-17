@@ -27,7 +27,9 @@ if (GOOGLE_CREDENTIALS_JSON) {
   try {
     googleAuthOptions.credentials = JSON.parse(GOOGLE_CREDENTIALS_JSON);
   } catch (error) {
-    throw new Error('Invalid GOOGLE_CREDENTIALS_JSON');
+    console.error('Failed to parse GOOGLE_CREDENTIALS_JSON:', error.message);
+    console.error('First 200 chars:', GOOGLE_CREDENTIALS_JSON.substring(0, 200));
+    throw new Error(`Invalid GOOGLE_CREDENTIALS_JSON: ${error.message}`);
   }
 } else if (GOOGLE_CREDENTIALS_FILE) {
   googleAuthOptions.keyFile = GOOGLE_CREDENTIALS_FILE;
