@@ -164,11 +164,8 @@ async function searchBooksInfo(isbns) {
       headers: headers
   });
 
-  // Join the ISBNs array into a comma-separated string and prepend with 'isbns='
-  const isbnsString = `isbns=${isbns.join(',')}`;
-
   try {
-      const response = await instance.post('/books', isbnsString);
+      const response = await instance.post('/books', { isbns });
       // console.log(response);
 
       // Assuming the response structure contains the books information
@@ -214,7 +211,7 @@ async function processGoogleDriveFiles() {
             console.log(`Parsed ${parsedData.length} rows from ${file.name}`);
 
             parsedData.forEach(row => {
-                const isbn = row['ISBN'];``
+                const isbn = row['ISBN'];
                 const sales = parseInt(row['Sales'], 10);
 
                 if (isbn && !isNaN(sales)) {
